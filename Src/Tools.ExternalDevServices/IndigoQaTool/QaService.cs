@@ -1,14 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.AI; // חובה עבור IChatClient ו-GetResponseAsync
+using Microsoft.Extensions.AI;
 using Azure.AI.OpenAI;
 using Azure.Identity;
-using OpenAI;
 using Newtonsoft.Json;
 using Tools.ExternalDevServices.AI.Orchestration.Flows.Jira;
 using Tools.ExternalDevServices.Integrations.Jira;
 using Tools.ExternalDevServices.Integrations.Confluence;
+
+// שימוש ב-alias כדי להפריד בין שני ה-ChatMessage
+using AzureChatMessage = OpenAI.Chat.ChatMessage;
+using AzureChatClient = OpenAI.Chat.ChatClient;
+using AzureUserMessage = OpenAI.Chat.UserChatMessage;
 
 namespace IndigoQaClient
 {
@@ -24,7 +29,8 @@ namespace IndigoQaClient
 
     public class QaService
     {
-        private readonly IChatClient _chatClient;
+        private readonly AzureChatClient _azureChatClient;
+        private readonly IChatClient _iChatClient;
         private readonly JiraDefectInformationAndRequirementsFlow _jiraFlow;
 
         // הגדרות מערכת
@@ -46,9 +52,9 @@ namespace IndigoQaClient
                 new Uri(azureEndpoint),
                 new DefaultAzureCredential());
 
-            // --- תיקון 1: שימוש ב-AsChatClient במקום new OpenAIChatClient ---
-            // פונקציה זו הופכת את הקליינט של Azure ל-IChatClient סטנדרטי
-            _chatClient = azureClient.AsChatClient(deploymentName);
+            // שני קליינטים נפרדים
+            _azureChatClient = azureClient.GetChatClient(deploymentName);
+            _iChatClient = _azureChatClient.AsIChatClient();
 
             // 2. יצירת הלקוחות ל-Jira ול-Confluence
             var jiraClient = new JiraRestApiClient(JiraUrl, "2", _userEmail, _jiraToken);
@@ -58,7 +64,7 @@ namespace IndigoQaClient
             _jiraFlow = new JiraDefectInformationAndRequirementsFlow(
                 jiraClient,
                 confluenceClient,
-                _chatClient,
+                _iChatClient,
                 null
             );
         }
@@ -78,11 +84,16 @@ namespace IndigoQaClient
                 // שלב ב: בניית הפרומפט
                 string prompt = BuildPrompt(contextData, options, instructions);
 
-                // --- תיקון 2: שימוש ב-GetResponseAsync במקום CompleteAsync ---
-                var response = await _chatClient.GetResponseAsync(prompt);
+                // שימוש ב-Azure OpenAI ישירות עם הטיפוסים שלו
+                var messages = new List<AzureChatMessage>
+                {
+                    new AzureUserMessage(prompt)
+                };
 
-                // חילוץ הטקסט מתוך התשובה
-                return response.Message.Text;
+                var completion = await _azureChatClient.CompleteChatAsync(messages);
+
+                // חילוץ הטקסט
+                return completion.Value.Content[0].Text ?? string.Empty;
             }
             catch (Exception ex)
             {
