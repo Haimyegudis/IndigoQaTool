@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Tools.ExternalDevServices.Integrations.$(MSBuildProjectName)</AssemblyName>
+    <RootNamespace>Tools.ExternalDevServices.Integrations.$(MSBuildProjectName.Replace(" ", "_").Replace("-", "_"))</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Selenium.Support" Version="4.38.0" />
+    <PackageReference Include="Selenium.WebDriver" Version="4.38.0" />
+  </ItemGroup>
+
+</Project>

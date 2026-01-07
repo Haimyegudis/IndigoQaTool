@@ -1,12 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.AI; // חובה בשביל IChatClient
-using OpenAI; // חובה בשביל ה-Client הקונקרטי
-
-// וודא שה-Namespaces האלו נכונים לפי ה-References שלך
+using Microsoft.Extensions.AI; // חובה עבור IChatClient ו-GetResponseAsync
+using Azure.AI.OpenAI;
+using Azure.Identity;
+using OpenAI;
+using Newtonsoft.Json;
+using Tools.ExternalDevServices.AI.Orchestration.Flows.Jira;
 using Tools.ExternalDevServices.Integrations.Jira;
 using Tools.ExternalDevServices.Integrations.Confluence;
 
@@ -24,111 +24,87 @@ namespace IndigoQaClient
 
     public class QaService
     {
+        private readonly IChatClient _chatClient;
+        private readonly JiraDefectInformationAndRequirementsFlow _jiraFlow;
+
+        // הגדרות מערכת
         private const string JiraUrl = "https://hp-jira.external.hp.com";
         private const string ConfluenceUrl = "https://v-indigo-confluence.inr.rd.hpicorp.net:6443";
 
-        // --- הכנס את הערכים שלך ---
+        // מלא את הפרטים שלך
         private string _jiraToken = "YOUR_JIRA_TOKEN";
         private string _confluenceToken = "YOUR_CONFLUENCE_TOKEN";
-        private string _user = "YOUR_EMAIL";
-        private string _aiKey = "YOUR_OPENAI_KEY";
-
-        private readonly IChatClient _chatClient;
+        private string _userEmail = "YOUR_EMAIL";
 
         public QaService()
         {
-            // יצירת הקליינט לפי הספרייה Microsoft.Extensions.AI.OpenAI
-            // אם השורה הזו נותנת שגיאה, וודא שהתקנת את החבילה: Microsoft.Extensions.AI.OpenAI
-            _chatClient = new OpenAIChatClient(new OpenAIClient(_aiKey), "gpt-4o");
+            // 1. התחברות ל-Azure OpenAI הארגוני
+            string azureEndpoint = "https://YOUR-ORG-INSTANCE.openai.azure.com/";
+            string deploymentName = "gpt-4o";
+
+            var azureClient = new AzureOpenAIClient(
+                new Uri(azureEndpoint),
+                new DefaultAzureCredential());
+
+            // --- תיקון 1: שימוש ב-AsChatClient במקום new OpenAIChatClient ---
+            // פונקציה זו הופכת את הקליינט של Azure ל-IChatClient סטנדרטי
+            _chatClient = azureClient.AsChatClient(deploymentName);
+
+            // 2. יצירת הלקוחות ל-Jira ול-Confluence
+            var jiraClient = new JiraRestApiClient(JiraUrl, "2", _userEmail, _jiraToken);
+            var confluenceClient = new ConfluenceRestApiClient(ConfluenceUrl, _confluenceToken);
+
+            // 3. אתחול ה-Flow
+            _jiraFlow = new JiraDefectInformationAndRequirementsFlow(
+                jiraClient,
+                confluenceClient,
+                _chatClient,
+                null
+            );
         }
 
-        public async Task<string> GeneratePlanAsync(string jiraKey, string manualLinksText, QaOptions options, string instructions)
+        public async Task<string> GeneratePlanAsync(string jiraKey, string manualLinks, QaOptions options, string instructions)
         {
-            var sbDocs = new StringBuilder();
-            List<string> urlsToProcess = new List<string>();
-
-            // 1. לינקים ידניים
-            if (!string.IsNullOrWhiteSpace(manualLinksText))
-            {
-                var links = manualLinksText.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var link in links) if (link.Trim().StartsWith("http")) urlsToProcess.Add(link.Trim());
-            }
-
-            // 2. Jira
-            if (!string.IsNullOrWhiteSpace(jiraKey))
-            {
-                try
-                {
-                    using var jira = new JiraRestApiClient(JiraUrl, "2", _user, _jiraToken);
-                    var issue = await IssueInfo.GetIssueInformationAsync(jira, jiraKey);
-
-                    if (issue != null)
-                    {
-                        string link = ExtractLink(issue.Description);
-                        if (!string.IsNullOrEmpty(link)) urlsToProcess.Add(link);
-                    }
-                }
-                catch (Exception ex) { return $"Error fetching from Jira: {ex.Message}"; }
-            }
-
-            // 3. Confluence
-            if (urlsToProcess.Count > 0)
-            {
-                try
-                {
-                    using var conf = new ConfluenceRestApiClient(ConfluenceUrl, _confluenceToken);
-                    foreach (var url in urlsToProcess.Distinct())
-                    {
-                        try
-                        {
-                            var content = await conf.GetDocumentAsMarkdownByUrlAsync(url);
-                            sbDocs.AppendLine($"\n--- Doc: {url} ---\n{content}");
-                        }
-                        catch { sbDocs.AppendLine($"Error reading {url}"); }
-                    }
-                }
-                catch (Exception ex) { return $"Error Confluence: {ex.Message}"; }
-            }
-
-            if (sbDocs.Length == 0) return "No content found.";
-
-            // 4. AI
-            string prompt = BuildPrompt(sbDocs.ToString(), options, instructions);
             try
             {
-                var response = await _chatClient.CompleteAsync(prompt);
+                // שלב א: שליפת מידע
+                var defectInfo = await _jiraFlow.GetDefectInformationAndRequirementsAsync(
+                    jiraKey,
+                    System.Threading.CancellationToken.None
+                );
+
+                string contextData = JsonConvert.SerializeObject(defectInfo, Formatting.Indented);
+
+                // שלב ב: בניית הפרומפט
+                string prompt = BuildPrompt(contextData, options, instructions);
+
+                // --- תיקון 2: שימוש ב-GetResponseAsync במקום CompleteAsync ---
+                var response = await _chatClient.GetResponseAsync(prompt);
+
+                // חילוץ הטקסט מתוך התשובה
                 return response.Message.Text;
             }
-            catch (Exception ex) { return $"AI Error: {ex.Message}"; }
-        }
-
-        private string ExtractLink(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return null;
-            int idx = text.IndexOf("https://");
-            if (idx == -1) return null;
-            int end = text.IndexOfAny(new[] { ' ', '\n', '\r', '"', '<' }, idx);
-            if (end == -1) end = text.Length;
-            return text.Substring(idx, end - idx);
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}\nStack: {ex.StackTrace}";
+            }
         }
 
         private string BuildPrompt(string content, QaOptions ops, string instructions)
         {
             var sb = new StringBuilder();
             sb.AppendLine("Act as a Senior QA Automation Engineer.");
-            sb.AppendLine("Create a Test Plan (Table: Test Name | Type | Steps | Expected Result).");
+            sb.AppendLine("Based on the provided Defect Information and Requirements, create a Test Plan (Table: Test Name | Type | Steps | Expected Result).");
 
-            if (ops.Sanity) sb.AppendLine("- Include Sanity");
-            if (ops.Negative) sb.AppendLine("- Include Negative");
+            if (ops.Sanity) sb.AppendLine("- Include Sanity Tests");
+            if (ops.Negative) sb.AppendLine("- Include Negative Tests");
             if (ops.Scenarios) sb.AppendLine("- Include Business Scenarios");
             if (ops.Ui) sb.AppendLine("- Include UI Tests");
-            if (ops.Values) sb.AppendLine("- Include Value Validation");
-            if (ops.Events) sb.AppendLine("- Include System Events");
 
             if (!string.IsNullOrWhiteSpace(instructions))
-                sb.AppendLine($"Instructions: {instructions}");
+                sb.AppendLine($"User Instructions: {instructions}");
 
-            sb.AppendLine("\nRequirements:\n" + content);
+            sb.AppendLine("\n--- DATA CONTEXT ---\n" + content);
             return sb.ToString();
         }
     }
