@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Tools.ExternalDevServices.AI.MCP.$(MSBuildProjectName)</AssemblyName>
+    <RootNamespace>Tools.ExternalDevServices.AI.MCP.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+
+    <!-- Bundle native libs; extract to a temp folder at runtime -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="ModelContextProtocol" Version="0.4.1-preview.1" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.4.1-preview.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Integrations\Confluence\Confluence.csproj" />
+    <ProjectReference Include="..\..\Embeddings\ConfluenceEmbeddingsService\ConfluenceEmbeddingsService.csproj" />
+    <ProjectReference Include="..\..\Orchestration\Orchestration.csproj" />
+    <ProjectReference Include="..\McpUtils\McpUtils.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,1 @@
+Place installers in same directory as corresponding MCP servers.

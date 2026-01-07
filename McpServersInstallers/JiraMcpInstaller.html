@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Install Jira MCP for VS Code</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #0b1220; --text: #e5e7eb; --muted: #9ca3af;
+      --border: #1f2937; --accent: #3b82f6; --accent2: #22c55e;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1f2937 0%,#0f172a 60%);color:var(--text);font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:40px 20px}
+    .wrap{max-width:1200px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+    header{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+    h1{margin:0;font-size:22px}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media (min-width:900px){.grid{grid-template-columns: 0.8fr 1.2fr}}
+    label{display:block;margin:8px 0 6px 0;font-weight:600}
+    input,select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#0f172a;color:var(--text)}
+    .row{background:#0f172a;border:1px solid var(--border);border-radius:12px;padding:16px}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    a.btn{display:inline-block;text-decoration:none;padding:10px 14px;border-radius:10px;border:1px solid var(--border);font-weight:700}
+    a.primary{background:var(--accent);color:#071225;border-color:#2563eb}
+    a.success{background:var(--accent2);color:#06120a;border-color:#16a34a}
+    .disabled{opacity:.45;pointer-events:none;filter:grayscale(30%)}
+    .hint{color:var(--muted);font-size:13px;margin-top:10px}
+    pre{
+      margin:10px 0;padding:12px;background:#0a1220;border:1px solid var(--border);
+      border-radius:10px;overflow:auto;font-size:13px;max-height:420px;
+      white-space:pre-wrap;word-break:break-word;
+    }
+    .input-affix{display:flex;align-items:stretch;gap:8px}
+    .input-affix .suffix{
+      display:inline-flex;align-items:center;padding:0 12px;border:1px solid var(--border);
+      border-radius:10px;background:#0f172a;color:var(--muted);white-space:nowrap
+    }
+    .name-row{display:grid;grid-template-columns:1fr;gap:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Jira MCP Installer</h1>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="row">
+        <label for="name">MCP Server Name</label>
+        <input id="name" type="text" placeholder="JiraMCP" value="JiraMCP" autocomplete="off" />
+
+        <label for="userPrefix">Jira User</label>
+        <input id="userPrefix" type="text" placeholder="user@hp.com" autocomplete="off" />
+		
+		<label for="jiraPat">Jira Personal Access Token</label>
+        <input id="jiraPat" type="text" placeholder="Enter Jira personal access token" autocomplete="off" />
+		
+		<label for="confPat">Confluence Personal Access Token</label>
+        <input id="confPat" type="text" placeholder="Enter Confluence personal access token" autocomplete="off" />
+
+        <div class="btns">
+          <a id="vscodeLink" class="btn primary disabled" href="#" role="button">Install in VS Code</a>
+          <a id="insidersLink" class="btn success disabled" href="#" role="button">Install in VS Code Insiders</a>
+        </div>
+        <div class="hint">Buttons enable when all fields are valid. The EXE must be next to this HTML.</div>
+      </div>
+
+      <div class="row">
+        <strong>Preview of installed server</strong>
+        <pre id="serverObj" aria-label="payload"></pre>
+        <div class="hint">Absolute path is computed from this HTML’s folder.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const exeName = "Tools.ExternalDevServices.AI.MCP.JiraMCP.exe";
+
+      // Resolve absolute path to the EXE placed alongside this HTML (Windows-friendly)
+      const u = new URL(window.location.href);
+      let p = decodeURIComponent(u.pathname);
+      if (/^\/[A-Za-z]:\//.test(p)) p = p.slice(1);          // drop leading slash for "C:/..."
+      const dir = p.replace(/\\/g, "/").replace(/\/[^/]*$/, "");
+      const exePathWin = (dir + "/" + exeName).replace(/\//g, "\\"); // absolute path for VS Code
+
+      const nameEl = document.getElementById("name");
+      const confPatEl = document.getElementById("confPat");
+      const jiraPatEl = document.getElementById("jiraPat");
+      const userEl = document.getElementById("userPrefix");
+      const vs = document.getElementById("vscodeLink");
+      const vsi = document.getElementById("insidersLink");
+      const preview = document.getElementById("serverObj");
+
+      function sanitizeName(v){
+        return (v || "").trim().replace(/[^A-Za-z0-9._-]/g, "");
+      }
+      function sanitizeUser(v){
+        return (v || "").trim().replace(/[^A-Za-z0-9._-]/g, "");
+      }
+
+      function buildServer() {
+        const name = sanitizeName(nameEl.value) || "JiraMCP";
+        const userFull = userEl.value.trim();
+        return {
+          name,
+          type: "stdio",
+          command: exePathWin,
+          args: [
+            "--user", userFull,
+			"--jira-personal-access-token", jiraPatEl.value,
+			"--confluence-personal-access-token", confPatEl.value
+          ]
+        };
+      }
+
+      function valid() {
+        const nameOk = sanitizeName(nameEl.value || "JiraMCP").length > 0;
+        const confOk = (confPatEl.value || "").trim().length > 0;
+        const jiraOk = (jiraPatEl.value || "").trim().length > 0;
+        const userOk = (userEl.value || "").trim().length > 0;
+        return nameOk && confOk && jiraOk && userOk;
+      }
+
+      function updateUI() {
+        const srv = buildServer();
+
+        // If user is empty, remove the trailing empty value to keep preview tidy
+        if (srv.args[srv.args.length-1] === "") {
+          srv.args.splice(-2); // remove "--user", ""
+        }
+
+        preview.textContent = JSON.stringify(srv, null, 2);
+
+        const enabled = valid();
+        const enc = encodeURIComponent(JSON.stringify(srv));
+        const href = `vscode:mcp/install?${enc}`;
+        const hrefI = `vscode-insiders:mcp/install?${enc}`;
+
+        vs.href = enabled ? href : "#";
+        vsi.href = enabled ? hrefI : "#";
+
+        vs.classList.toggle("disabled", !enabled);
+        vsi.classList.toggle("disabled", !enabled);
+      }
+
+      nameEl.addEventListener("input", updateUI);
+      confPatEl.addEventListener("input", updateUI);
+      jiraPatEl.addEventListener("input", updateUI);
+      userEl.addEventListener("input", updateUI);
+      updateUI();
+    })();
+  </script>
+</body>
+</html>

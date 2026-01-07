@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Tools.ExternalDevServices.AI.Embeddings.$(MSBuildProjectName)</AssemblyName>
+    <RootNamespace>Tools.ExternalDevServices.AI.Embeddings.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.0.1-preview.1.25571.5" />
+    <PackageReference Include="OpenAI" Version="2.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Integrations\Confluence\Confluence.csproj" />
+    <ProjectReference Include="..\ConfluenceEmbeddingsService\ConfluenceEmbeddingsService.csproj" />
+  </ItemGroup>
+
+</Project>

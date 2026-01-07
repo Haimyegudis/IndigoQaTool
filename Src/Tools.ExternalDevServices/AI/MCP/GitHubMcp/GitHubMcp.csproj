@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Tools.ExternalDevServices.AI.MCP.$(MSBuildProjectName)</AssemblyName>
+    <RootNamespace>Tools.ExternalDevServices.AI.MCP.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="Markdig" Version="0.44.0" />
+    <PackageReference Include="Markdig.SyntaxHighlighting" Version="1.1.7" />
+    <PackageReference Include="ModelContextProtocol" Version="0.4.1-preview.1" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.4.1-preview.1" />
+    <PackageReference Include="NJsonSchema" Version="11.5.2" />
+    <PackageReference Include="OpenAI" Version="2.7.0" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.0.1-preview.1.25571.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orchestration\Orchestration.csproj" />
+    <ProjectReference Include="..\McpUtils\McpUtils.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Resources\Prompts\GeneralPullRequestReviewInstructions.prompt.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Prompts\SpecificPullRequestReviewInstructions.prompt.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+
+    <!-- Include Content/None items inside the EXE and extract at runtime -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+
+    <!-- Bundle native libs; extract to a temp folder at runtime -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pick the files to include; folder structure is preserved -->
+    <Content Include="Resources\Prompts\**\*.md" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="false" />
+  </ItemGroup>
+
+</Project>

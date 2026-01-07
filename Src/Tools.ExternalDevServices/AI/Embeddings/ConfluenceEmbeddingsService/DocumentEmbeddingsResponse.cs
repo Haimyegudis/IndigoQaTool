@@ -1,0 +1,3 @@
+﻿namespace Tools.ExternalDevServices.AI.Embeddings.ConfluenceEmbeddingsService;
+
+public record DocumentEmbeddingsResponse(DocumentEmbeddings DocumentEmbeddings, double Similarity);

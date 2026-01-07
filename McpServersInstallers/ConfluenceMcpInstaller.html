@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Install Confluence MCP for VS Code</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #0b1220; --text: #e5e7eb; --muted: #9ca3af;
+      --border: #1f2937; --accent: #3b82f6; --accent2: #22c55e;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1f2937 0%,#0f172a 60%);color:var(--text);font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:40px 20px}
+    .wrap{max-width:1200px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+    header{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(145deg,#3b82f6,#22c55e);display:grid;place-items:center;font-weight:800;color:#0b1220;box-shadow:inset 0 0 20px rgba(255,255,255,.35)}
+    h1{margin:0;font-size:22px}
+    .sub{color:var(--muted);margin-top:4px}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media (min-width:900px){.grid{grid-template-columns: 0.8fr 1.2fr}}
+    label{display:block;margin:8px 0 6px 0;font-weight:600}
+    input,select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#0f172a;color:var(--text)}
+    .row{background:#0f172a;border:1px solid var(--border);border-radius:12px;padding:16px}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    a.btn{display:inline-block;text-decoration:none;padding:10px 14px;border-radius:10px;border:1px solid var(--border);font-weight:700}
+    a.primary{background:var(--accent);color:#071225;border-color:#2563eb}
+    a.success{background:var(--accent2);color:#06120a;border-color:#16a34a}
+    .disabled{opacity:.45;pointer-events:none;filter:grayscale(30%)}
+    .hint{color:var(--muted);font-size:13px;margin-top:10px}
+    code.inline{background:#0a1220;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+    pre{
+      margin:10px 0;padding:12px;background:#0a1220;border:1px solid var(--border);
+      border-radius:10px;overflow:auto;font-size:13px;max-height:420px;
+      white-space:pre-wrap;word-break:break-word; /* keep content inside the box */
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Confluence MCP Installer</h1>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="row">
+        <label for="name">MCP Server Name</label>
+        <input id="name" type="text" placeholder="ConfluenceMCP" value="ConfluenceMCP" autocomplete="off" />
+
+        <label for="pat">Confluence Personal Access Token</label>
+        <input id="pat" type="text" placeholder="Enter Confluence personal access token" autocomplete="off" />
+
+        <label for="series">Series</label>
+        <select id="series">
+          <option value="">Select…</option>
+          <option value="S4">S4</option>
+          <option value="S5">S5</option>
+          <option value="S6">S6</option>
+        </select>
+
+        <div class="btns">
+          <a id="vscodeLink" class="btn primary disabled" href="#" role="button">Install in VS Code</a>
+          <a id="insidersLink" class="btn success disabled" href="#" role="button">Install in VS Code Insiders</a>
+        </div>
+        <div class="hint">Buttons enable when all fields are valid. The EXE must be next to this HTML.</div>
+      </div>
+
+      <div class="row">
+        <strong>Preview of installed server</strong>
+        <pre id="serverObj" aria-label="payload"></pre>
+        <div class="hint">Absolute path is computed from this HTML’s folder.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const exeName = "Tools.ExternalDevServices.AI.MCP.ConfluenceMCP.exe";
+
+      // Resolve absolute path to the EXE placed alongside this HTML (Windows-friendly)
+      const u = new URL(window.location.href);
+      let p = decodeURIComponent(u.pathname);
+      if (/^\/[A-Za-z]:\//.test(p)) p = p.slice(1);          // drop leading slash for "C:/..."
+      const dir = p.replace(/\\/g, "/").replace(/\/[^/]*$/, "");
+      const exePathWin = (dir + "/" + exeName).replace(/\//g, "\\"); // VS Code prefers absolute paths or PATH-resident commands
+
+      const nameEl = document.getElementById("name");
+      const patEl = document.getElementById("pat");
+      const seriesEl = document.getElementById("series");
+      const vs = document.getElementById("vscodeLink");
+      const vsi = document.getElementById("insidersLink");
+      const preview = document.getElementById("serverObj");
+
+      function sanitizeName(v){
+        // Allow letters, numbers, dash, underscore, dot; trim spaces
+        return (v || "").trim().replace(/[^A-Za-z0-9._-]/g, "");
+      }
+
+      function buildServer() {
+        const name = sanitizeName(nameEl.value) || "ConfluenceMCP";
+        return {
+          name,
+          type: "stdio",
+          command: exePathWin,
+          args: [
+            "--personal-access-token", patEl.value,
+            "--series", seriesEl.value
+          ]
+        };
+      }
+
+      function valid() {
+        const nameOk = sanitizeName(nameEl.value || "ConfluenceMCP").length > 0;
+        const patOk = (patEl.value || "").trim().length > 0;
+        const allowed = ["S4","S5","S6"];
+        const seriesOk = allowed.includes(seriesEl.value);
+        return nameOk && patOk && seriesOk;
+      }
+
+      function updateUI() {
+        const srv = buildServer();
+        preview.textContent = JSON.stringify(srv, null, 2);
+
+        const enabled = valid();
+        const enc = encodeURIComponent(JSON.stringify(srv));
+        const href = `vscode:mcp/install?${enc}`;
+        const hrefI = `vscode-insiders:mcp/install?${enc}`;
+
+        vs.href = enabled ? href : "#";
+        vsi.href = enabled ? hrefI : "#";
+
+        vs.classList.toggle("disabled", !enabled);
+        vsi.classList.toggle("disabled", !enabled);
+      }
+
+      nameEl.addEventListener("input", updateUI);
+      patEl.addEventListener("input", updateUI);
+      seriesEl.addEventListener("change", updateUI);
+      updateUI();
+    })();
+  </script>
+</body>
+</html>
